@@ -1,0 +1,31 @@
+
+{
+  "sources": [
+    { "id": "pb-anker-737", "brand": "Anker", "model": "737 (PowerCore 24K)", "type": "Павербанк", "capacityWh": 86.4, "capacityMah": 24000, "nominalVoltage": 3.6, "maxOutputW": 140, "popular": true },
+    { "id": "pb-baseus-blade", "brand": "Baseus", "model": "Blade 100W 20000mAh", "type": "Павербанк", "capacityWh": 74, "capacityMah": 20000, "nominalVoltage": 3.7, "maxOutputW": 100, "popular": true },
+    { "id": "pb-baseus-amb-30", "brand": "Baseus", "model": "Amblight 30000mAh 65W", "type": "Павербанк", "capacityWh": 111, "capacityMah": 30000, "nominalVoltage": 3.7, "maxOutputW": 65, "popular": true },
+    { "id": "pb-xiaomi-mi3-p", "brand": "Xiaomi", "model": "Mi Power Bank 3 Pro 20000mAh", "type": "Павербанк", "capacityWh": 74, "capacityMah": 20000, "nominalVoltage": 3.7, "maxOutputW": 45, "popular": true },
+    { "id": "ps-ef-r2", "brand": "EcoFlow", "model": "RIVER 2 (256Wh)", "type": "Зарядна станція", "capacityWh": 256, "nominalVoltage": 12.8, "maxOutputW": 300, "popular": true },
+    { "id": "ps-ef-r2m", "brand": "EcoFlow", "model": "RIVER 2 Max (512Wh)", "type": "Зарядна станція", "capacityWh": 512, "nominalVoltage": 12.8, "maxOutputW": 500, "popular": true },
+    { "id": "ps-ef-d2", "brand": "EcoFlow", "model": "DELTA 2 (1024Wh)", "type": "Зарядна станція", "capacityWh": 1024, "nominalVoltage": 51.2, "maxOutputW": 1800, "popular": true },
+    { "id": "ps-bluetti-eb3a", "brand": "Bluetti", "model": "EB3A (268Wh)", "type": "Зарядна станція", "capacityWh": 268, "nominalVoltage": 12, "maxOutputW": 600, "popular": true },
+    { "id": "pb-ugreen-145w", "brand": "Ugreen", "model": "Nexode 145W 25000mAh", "type": "Павербанк", "capacityWh": 90, "capacityMah": 25000, "nominalVoltage": 3.6, "maxOutputW": 145 },
+    { "id": "ups-apc-700", "brand": "APC", "model": "Back-UPS 700VA", "type": "ДБЖ (UPS)", "capacityWh": 84, "nominalVoltage": 12, "maxOutputW": 390 },
+    { "id": "bat-life-100", "brand": "LiFePO4", "model": "12V 100Ah (1280Wh)", "type": "Акумулятор", "capacityWh": 1280, "nominalVoltage": 12.8, "maxOutputW": 1200 }
+  ],
+  "devices": [
+    { "id": "pop-iphone-15", "category": "Смартфон", "name": "iPhone 15 / 16", "type": "Заряджання батареї", "powerW": 3, "batteryWh": 13, "preferredPort": "USB-C PD", "requiredW": 20, "popular": true },
+    { "id": "pop-mac-air", "category": "Ноутбук", "name": "MacBook Air (M1/M2/M3)", "type": "Заряджання батареї", "powerW": 10, "batteryWh": 52.6, "preferredPort": "USB-C PD", "requiredW": 30, "popular": true },
+    { "id": "pop-router", "category": "Мережа", "name": "Wi-Fi Роутер (стандартний)", "type": "Постійне навантаження", "powerW": 8, "preferredPort": "DC 12V", "requiredW": 12, "popular": true },
+    { "id": "pop-onu", "category": "Мережа", "name": "ONU термінал (оптика)", "type": "Постійне навантаження", "powerW": 4, "preferredPort": "DC 12V", "requiredW": 6, "popular": true },
+    { "id": "pop-starlink", "category": "Мережа", "name": "Starlink V2", "type": "Постійне навантаження", "powerW": 55, "preferredPort": "AC 220V", "requiredW": 100, "popular": true },
+    { "id": "pop-lamp-usb", "category": "Освітлення", "name": "LED Лампа USB", "type": "Постійне навантаження", "powerW": 5, "preferredPort": "USB-A", "requiredW": 5, "popular": true }
+  ],
+  "templates": {
+    "phoneModels": ["iPhone 16 Pro Max", "iPhone 15 Pro", "Samsung S24 Ultra", "Pixel 9 Pro", "Xiaomi 14", "OnePlus 12", "Redmi Note 13"],
+    "laptopModels": ["MacBook Pro 14", "Dell XPS 13", "Lenovo ThinkPad X1", "Asus ZenBook", "HP Spectre"],
+    "routerModels": ["TP-Link Archer", "Asus RT", "Keenetic Giga", "MikroTik hap", "Xiaomi Mi Router"],
+    "lighting": ["LED Bulb", "LED Strip", "Desk Lamp", "Emergency Light"],
+    "other": ["Monitor 24\"", "TV 43\"", "Fan", "Small Fridge", "Game Console"]
+  }
+}

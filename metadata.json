@@ -1,0 +1,5 @@
+{
+  "name": "PowerGuard: Blackout Planner",
+  "description": "Professional tool for calculating power autonomy from power banks, portable stations, and UPS during blackouts. Includes detailed efficiency analysis, port limitations, and usage scenarios.",
+  "requestFramePermissions": []
+}
