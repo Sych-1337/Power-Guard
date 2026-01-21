@@ -25,12 +25,12 @@ export interface PowerSource {
   type: PowerSourceType;
   capacityWh: number;
   capacityMah?: number;
-  nominalVoltage: number; // usually 3.7 for li-ion
+  nominalVoltage: number;
   maxOutputW: number;
   efficiency: {
     [key in PortType]: number;
   };
-  healthFactor: number; // 1.0 (new), 0.85 (mid), 0.7 (old)
+  healthFactor: number;
 }
 
 export interface Device {
@@ -38,17 +38,28 @@ export interface Device {
   category: string;
   name: string;
   type: DeviceType;
-  powerW: number; // Avg consumption or charging speed
-  batteryWh?: number; // for chargeable devices
+  powerW: number;
+  batteryWh?: number;
   preferredPort: PortType;
   requiredW: number;
+  usageHours?: number;
 }
 
 export interface Scenario {
   id: string;
   name: string;
   hoursPerDay: number;
-  intensityMultiplier: number; // 0.5 (eco), 1.0 (normal), 1.5 (max)
+  intensityMultiplier: number;
+}
+
+export interface NodePosition {
+  x: number;
+  y: number;
+}
+
+export interface Connection {
+  sourceId: string;
+  deviceId: string;
 }
 
 export interface CalculationResult {
