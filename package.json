@@ -2,6 +2,7 @@
   "name": "powerguard:-blackout-planner",
   "private": true,
   "version": "0.0.0",
+  "homepage": "https://sych-1337.github.io/Power-Guard/",
   "type": "module",
   "scripts": {
     "dev": "vite",
