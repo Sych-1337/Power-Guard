@@ -1,10 +1,11 @@
 
-import { PowerSource, Device, DeviceType, PortType, Scenario, CalculationResult } from './types';
+import { PowerSource, Device, DeviceType, PortType, Scenario, CalculationResult, PowerSourceType, Connection } from './types';
 
 export const calculateAutonomy = (
   sources: PowerSource[],
   devices: Device[],
-  scenario: Scenario
+  scenario: Scenario,
+  connections: Connection[] = []
 ): CalculationResult => {
   const result: CalculationResult = {
     totalRuntimeHours: 0,
@@ -17,66 +18,84 @@ export const calculateAutonomy = (
 
   if (sources.length === 0 || devices.length === 0) return result;
 
-  // 1. Calculate combined usable energy from all external sources
-  let totalUsableBankWh = 0;
-  sources.forEach(source => {
-    // Determine the most likely port being used to apply correct efficiency
-    // If there's a station, we assume it might use AC or DC. 
-    // For general calculation we use a blended efficiency.
-    const avgEff = source.type === 'Зарядна станція' ? 0.88 : 0.85;
-    const usable = source.capacityWh * source.healthFactor * avgEff;
-    totalUsableBankWh += usable;
-    result.runtimePerSource[source.id] = usable;
-  });
-
-  // 2. Calculate Load & Initial Internal Battery Buffer
-  let totalHourlyDrainW = 0;
-  let totalInternalBatteryWh = 0;
-
+  // 1. Group devices by source connection
+  const sourceToDevices = new Map<string, Device[]>();
   devices.forEach(device => {
-    // Current drain power (adjusted by intensity)
-    const hourlyDrain = device.powerW * scenario.intensityMultiplier;
-    totalHourlyDrainW += hourlyDrain;
-
-    // Buffer: If device is already charged, add its internal battery to the "energy pool"
-    if (device.type === DeviceType.CHARGEABLE && device.batteryWh) {
-      totalInternalBatteryWh += device.batteryWh;
-
-      // Calculate how many full recharges the banks can provide
-      // Losses happen during transfer (PowerBank -> Device Battery)
-      const usableTransferredWh = totalUsableBankWh;
-      const chargeCostWh = device.batteryWh / 0.85; // 0.85 is charging efficiency
-      result.chargeCounts[device.id] = Math.floor((usableTransferredWh / chargeCostWh) * 10) / 10;
+    const conn = connections.find(c => c.deviceId === device.id);
+    if (conn) {
+      const devs = sourceToDevices.get(conn.sourceId) || [];
+      devs.push(device);
+      sourceToDevices.set(conn.sourceId, devs);
     }
   });
 
-  // 3. Final Runtime Calculation: (Bank Energy + Internal Energy) / Total Drain
-  if (totalHourlyDrainW > 0) {
-    result.totalRuntimeHours = (totalUsableBankWh + totalInternalBatteryWh) / totalHourlyDrainW;
+  let totalUsableSystemWh = 0;
+  let totalSystemDailyWhNeeded = 0;
 
-    // Distribute source-specific runtime for visual feedback
-    Object.keys(result.runtimePerSource).forEach(id => {
-      const sourceUsableWh = result.runtimePerSource[id];
-      result.runtimePerSource[id] = sourceUsableWh / totalHourlyDrainW;
+  // 2. Calculate per-source capacity and runtime
+  sources.forEach(source => {
+    const connectedDevices = sourceToDevices.get(source.id) || [];
+    
+    // Average efficiency based on ports used
+    const avgEfficiency = connectedDevices.length > 0 
+      ? connectedDevices.reduce((sum, d) => sum + (source.efficiency[d.preferredPort] || 0.85), 0) / connectedDevices.length
+      : (source.type === PowerSourceType.STATION ? 0.90 : 0.85);
+
+    const usableWh = source.capacityWh * source.healthFactor * avgEfficiency;
+    totalUsableSystemWh += usableWh;
+
+    // Calculate daily consumption for THIS source based on device usage hours
+    let sourceDailyWhNeeded = 0;
+    let sourceInstantLoadW = 0;
+
+    connectedDevices.forEach(d => {
+      const consumptionW = d.powerW * scenario.intensityMultiplier;
+      const hours = d.usageHours || scenario.hoursPerDay;
+      sourceDailyWhNeeded += consumptionW * hours;
+      sourceInstantLoadW += consumptionW;
     });
+
+    totalSystemDailyWhNeeded += sourceDailyWhNeeded;
+
+    // Runtime calculation: How many hours this source lasts if everything runs simultaneously
+    if (sourceInstantLoadW > 0) {
+      result.runtimePerSource[source.id] = usableWh / sourceInstantLoadW;
+    } else {
+      result.runtimePerSource[source.id] = Infinity;
+    }
+
+    // Peak Load / Overload check
+    const peakLoadW = connectedDevices.reduce((sum, d) => sum + d.requiredW, 0);
+    if (peakLoadW > source.maxOutputW) {
+      result.warnings.push(`Перевантаження "${source.model}": пік ${peakLoadW}W > макс ${source.maxOutputW}W.`);
+    }
+  });
+
+  // 3. Add internal battery capacities of devices to the system total
+  devices.forEach(device => {
+    if (device.batteryWh) {
+      totalUsableSystemWh += device.batteryWh;
+    }
+  });
+
+  // 4. Calculate Global Autonomy based on daily cycle
+  if (totalSystemDailyWhNeeded > 0) {
+    // How many daily cycles the system covers
+    const cyclesCovered = totalUsableSystemWh / totalSystemDailyWhNeeded;
+    result.totalRuntimeHours = cyclesCovered * scenario.hoursPerDay;
   } else {
     result.totalRuntimeHours = 0;
   }
 
-  // 4. Overload Warnings
-  const peakRequiredW = devices.reduce((sum, d) => sum + d.requiredW, 0);
-  sources.forEach(source => {
-    if (peakRequiredW > source.maxOutputW) {
-      result.warnings.push(`Ризик перевантаження джерела "${source.brand} ${source.model}" (Пік ${peakRequiredW}Вт > Макс ${source.maxOutputW}Вт).`);
-    }
-  });
+  // 5. Recommendations
+  const hasPC = devices.some(d => (d.category === "Комп'ютер" || d.powerW > 100) && connections.some(c => c.deviceId === d.id));
+  const onlyPBs = sources.every(s => s.type === PowerSourceType.POWERBANK);
+  if (hasPC && onlyPBs) {
+    result.warnings.push("Павербанки не підходять для ПК. Використовуйте станції або ДБЖ.");
+  }
 
-  // 5. Productive Recommendations
-  result.recommendations.push("Розрахунок базується на 'розумному' циклі: повна зарядка -> використання до розрядки -> повторна зарядка.");
-  result.recommendations.push("Користуйтесь пристроями від вбудованої батареї до 10-20%, потім підключайте павербанк — це мінімізує втрати на фонове живлення плати павербанка.");
-  
-  if (totalUsableBankWh > 200) {
-    result.recommendations.push("При великій ємності джерел намагайтесь живити роутер та ONU через DC-кабелі 12В замість розетки 220В — це додасть 15-20% часу роботи.");
+  if (result.totalRuntimeHours < scenario.hoursPerDay && devices.length > 0) {
+    result.recommendations.push("Заряду не вистачить на повний цикл. Вимкніть потужних споживачів.");
   }
 
   return result;
