@@ -150,16 +150,31 @@ const App: React.FC = () => {
   const addSource = (source: PowerSource) => {
     const newId = `${source.id}-${Date.now()}`;
     const newSource = { ...source, id: newId };
-    setSelectedSources([...selectedSources, newSource]);
+    setSelectedSources(prev => [...prev, newSource]);
     setPositions(prev => ({ ...prev, [newId]: { x: 40, y: 100 + selectedSources.length * 150 } }));
+    
+    // Auto-connect any devices that have NO connection
+    const unconnectedDevices = selectedDevices.filter(d => !connections.some(c => c.deviceId === d.id));
+    if (unconnectedDevices.length > 0) {
+      const newConns = unconnectedDevices.map(d => ({ sourceId: newId, deviceId: d.id }));
+      setConnections(prev => [...prev, ...newConns]);
+    }
+
     showToast(`${source.model} додано`, 'source', Battery);
   };
 
   const addDevice = (device: Device) => {
     const newId = `${device.id}-${Date.now()}`;
     const newDevice = { ...device, usageHours: scenario.hoursPerDay, id: newId };
-    setSelectedDevices([...selectedDevices, newDevice]);
+    setSelectedDevices(prev => [...prev, newDevice]);
     setPositions(prev => ({ ...prev, [newId]: { x: 500, y: 100 + selectedDevices.length * 150 } }));
+    
+    // Auto-connect to first available source if it exists
+    if (selectedSources.length > 0) {
+      const bestSource = selectedSources.find(s => device.requiredW <= s.maxOutputW) || selectedSources[0];
+      setConnections(prev => [...prev, { sourceId: bestSource.id, deviceId: newId }]);
+    }
+
     showToast(`${device.name} додано`, 'device', Zap);
   };
 
@@ -466,23 +481,50 @@ const App: React.FC = () => {
                  <button onClick={() => setIsDeviceModalOpen(true)} className="text-[10px] font-black text-blue-500 uppercase hover:text-white transition-colors">+ ДОДАТИ</button>
               </div>
               <div className="space-y-3">
-                 {selectedDevices.map(d => (
-                   <div key={d.id} className="glass rounded-[2rem] p-6 flex flex-col gap-6 border border-white/5 hover:border-indigo-500/20 transition-all">
-                      <div className="flex justify-between items-start">
-                         <div className="flex items-center gap-5">
-                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-indigo-400">{d.category === 'Комп\'ютер' ? <Monitor className="w-6 h-6" /> : <Zap className="w-6 h-6" />}</div>
-                            <div><p className="text-[10px] font-black text-indigo-500 uppercase mb-0.5">{d.category}</p><p className="text-sm font-extrabold text-white">{d.name}</p></div>
-                         </div>
-                         <button onClick={() => removeDevice(d.id)} className="p-2 text-slate-800 hover:text-red-500"><Trash2 className="w-5 h-5" /></button>
-                      </div>
-                      <div className="pt-4 border-t border-white/5 space-y-3">
-                         <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase"><span>Час активності:</span><span className="text-blue-500 font-black">{d.usageHours ?? scenario.hoursPerDay} год</span></div>
-                         <input type="range" min="0.5" max={scenario.hoursPerDay} step="0.5" value={d.usageHours ?? scenario.hoursPerDay} onChange={e => {
-                           setSelectedDevices(prev => prev.map(dev => dev.id === d.id ? { ...dev, usageHours: parseFloat(e.target.value) } : dev));
-                         }} className="w-full accent-blue-600 h-1.5 bg-slate-900 rounded-full appearance-none cursor-pointer" />
-                      </div>
-                   </div>
-                 ))}
+                 {selectedDevices.map(d => {
+                   const conn = connections.find(c => c.deviceId === d.id);
+                   const status = conn ? getConnectionStatus(conn.sourceId, d.id) : 'normal';
+                   const runtime = conn ? Math.min(results.runtimePerSource[conn.sourceId] || 0, d.usageHours || scenario.hoursPerDay) : 0;
+                   const statusColor = status === 'error' || status === 'insufficient' ? 'text-red-500' : status === 'marginal' ? 'text-yellow-500' : status === 'success' ? 'text-green-500' : 'text-slate-500';
+
+                   return (
+                     <div key={d.id} className="glass rounded-[2rem] p-6 flex flex-col gap-6 border border-white/5 hover:border-indigo-500/20 transition-all">
+                        <div className="flex justify-between items-start">
+                           <div className="flex items-center gap-5">
+                              <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-indigo-400">{d.category === 'Комп\'ютер' ? <Monitor className="w-6 h-6" /> : <Zap className="w-6 h-6" />}</div>
+                              <div><p className="text-[10px] font-black text-indigo-500 uppercase mb-0.5">{d.category}</p><p className="text-sm font-extrabold text-white">{d.name}</p></div>
+                           </div>
+                           <button onClick={() => removeDevice(d.id)} className="p-2 text-slate-800 hover:text-red-500"><Trash2 className="w-5 h-5" /></button>
+                        </div>
+                        
+                        {/* Desktop List Mode Source Selection */}
+                        <div className="grid grid-cols-2 gap-4 py-4 border-y border-white/5">
+                           <div className="space-y-1">
+                              <span className="text-[8px] font-black text-slate-500 uppercase">Джерело живлення</span>
+                              <select 
+                                value={conn?.sourceId || ""} 
+                                onChange={(e) => updateConnection(d.id, e.target.value)}
+                                className="w-full bg-slate-900 border border-white/10 text-[10px] font-bold text-white rounded-lg p-2 outline-none cursor-pointer focus:border-blue-500/50"
+                              >
+                                <option value="">Не підключено</option>
+                                {selectedSources.map(s => <option key={s.id} value={s.id}>{s.brand} {s.model}</option>)}
+                              </select>
+                           </div>
+                           <div className="flex flex-col items-end justify-center">
+                              <span className="text-[8px] font-black text-slate-500 uppercase mb-1">Час роботи</span>
+                              <span className={`text-lg font-black ${statusColor}`}>{conn ? `${runtime.toFixed(1)} год` : '---'}</span>
+                           </div>
+                        </div>
+
+                        <div className="space-y-3">
+                           <div className="flex justify-between text-[9px] font-black text-slate-500 uppercase"><span>Активність:</span><span className="text-blue-500 font-black">{d.usageHours ?? scenario.hoursPerDay} год</span></div>
+                           <input type="range" min="0.5" max={scenario.hoursPerDay} step="0.5" value={d.usageHours ?? scenario.hoursPerDay} onChange={e => {
+                             setSelectedDevices(prev => prev.map(dev => dev.id === d.id ? { ...dev, usageHours: parseFloat(e.target.value) } : dev));
+                           }} className="w-full accent-blue-600 h-1.5 bg-slate-900 rounded-full appearance-none cursor-pointer" />
+                        </div>
+                     </div>
+                   );
+                 })}
                  {selectedDevices.length === 0 && (
                     <button onClick={() => setIsDeviceModalOpen(true)} className="w-full py-10 border-2 border-dashed border-white/5 rounded-[2rem] text-[10px] font-black text-slate-600 uppercase hover:text-slate-400 transition-colors">+ ДОДАТИ ПРИСТРОЇ</button>
                  )}
